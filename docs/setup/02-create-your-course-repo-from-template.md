@@ -25,9 +25,26 @@ Make sure:
 
 Your instructor will give you the template repository link.
 
+In most classes, this link is shared in one of these places:
+
+- the class chat
+- the LMS or course page
+- email
+- a slide or QR code during class
+
 Open that repository in your browser.
 
 You should see the course files on the main page of the repository.
+
+The link should look similar to:
+
+`https://github.com/<instructor-or-course-account>/<student-template-repo>`
+
+Important:
+
+- open the repository main page, not the `Settings` page
+- make sure the repository is public
+- make sure you can see the files before you continue
 
 ## Step 2: Click `Use this template`
 
@@ -54,6 +71,15 @@ You can keep the default branch name that GitHub creates.
 Click `Create repository`.
 
 GitHub will generate a new repository under your account using the course template files.
+
+This means:
+
+- the new repository belongs to you, not to the instructor
+- you start with the same files as the course template
+- your workflow runs will happen in your own repository
+- your later commits will be your own work
+
+For this course, that is exactly what we want.
 
 ## Step 5: Confirm That the Repository Belongs to You
 

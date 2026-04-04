@@ -29,10 +29,10 @@ jobs:
 
       - name: Fetch Python Version from Secret
         id: get-version
+        env:
+           SECRET_VAL: ${{ secrets[format('PYTHON_{0}', matrix.version_label)] }}
         run: |
-          # Dynamically picks PYTHON_V1 or PYTHON_V2
-          VERSION=${{ secrets[format('PYTHON_{0}', matrix.version_id)] }}
-          echo "selected_version=$VERSION" >> "$GITHUB_OUTPUT"
+           echo "selected_version=$VERSION" >> "$GITHUB_OUTPUT"
 
       - name: Set up Python
         # Prepare Python so the workflow can run the tests first.

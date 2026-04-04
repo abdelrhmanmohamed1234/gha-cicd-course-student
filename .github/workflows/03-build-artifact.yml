@@ -1,8 +1,6 @@
-# This workflow packages the verified app across multiple Python versions.
 name: 03 Build Artifact Workflow
 
 on:
-  # Students start this workflow manually from the Actions tab.
   workflow_dispatch:
 
 env:
@@ -13,12 +11,10 @@ env:
 jobs:
   build-package:
     runs-on: ubuntu-latest
-
     strategy:
-      # Set to false so if V1 fails, V2 still completes.
       fail-fast: false
       matrix:
-        # These are labels that match your secrets (PYTHON_V1, PYTHON_V2)
+        # Use simple IDs that match your secret suffixes
         version_id: [V1, V2]
 
     steps:
@@ -28,16 +24,16 @@ jobs:
       - name: Fetch Python Version from Secret
         id: get-version
         env:
-          # This pulls the actual secret value (e.g., 3.11) based on the matrix ID
-          SECRET_VAL: ${{ secrets[format('PYTHON_{0}', matrix.version_id)] }}
+          # Pull the secret based on matrix.version_id (e.g., PYTHON_V1)
+          RAW_VERSION: ${{ secrets[format('PYTHON_{0}', matrix.version_id)] }}
         run: |
-          # We save the secret value to the step output so others can use it
-          echo "selected_version=$SECRET_VAL" >> "$GITHUB_OUTPUT"
+          # Pass the hidden secret value to the step output
+          echo "selected_version=$RAW_VERSION" >> "$GITHUB_OUTPUT"
 
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          # IMPORTANT: Use the output from the fetch step, NOT the matrix ID
+          # Use the output from the fetch step, NOT the matrix
           python-version: ${{ steps.get-version.outputs.selected_version }}
 
       - name: Run tests
@@ -46,9 +42,8 @@ jobs:
       - name: Set image tag
         id: image-tag
         run: |
-          # Added the version ID to the tag to distinguish between the two builds
-          IMAGE_TAG="${{ matrix.version_id }}-run-${GITHUB_RUN_NUMBER}"
-          echo "image_tag=$IMAGE_TAG" >> "$GITHUB_OUTPUT"
+          # Include version_id so artifacts are distinct
+          echo "image_tag=${{ matrix.version_id }}-run-${GITHUB_RUN_NUMBER}" >> "$GITHUB_OUTPUT"
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -57,14 +52,14 @@ jobs:
         uses: docker/build-push-action@v6
         with:
           context: .
-          # We give the tar file a unique name per matrix run
+          # Export directly to tar file (replaces 'docker save')
           outputs: type=docker,dest=${{ matrix.version_id }}-${{ env.IMAGE_TAR }}
           tags: ${{ env.IMAGE_NAME }}:${{ steps.image-tag.outputs.image_tag }}
 
       - name: Upload build artifact
         uses: actions/upload-artifact@v4
         with:
-          # Unique name for each artifact so they don't overwrite each other
+          # Give each version a unique artifact name
           name: ${{ env.ARTIFACT_NAME }}-${{ matrix.version_id }}
           path: ${{ matrix.version_id }}-${{ env.IMAGE_TAR }}
           retention-days: 7

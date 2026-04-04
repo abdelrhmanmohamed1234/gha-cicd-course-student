@@ -1,5 +1,4 @@
-# This workflow packages the verified app.
-# It is manual on purpose so Day 1 stays focused on CI.
+# This workflow packages the verified app across multiple Python versions.
 name: 03 Build Artifact Workflow
 
 on:
@@ -7,64 +6,65 @@ on:
   workflow_dispatch:
 
 env:
-  # Keep common image values in one place so the build steps stay readable.
   IMAGE_NAME: tiny-health-app
   IMAGE_TAR: tiny-health-app.tar
   ARTIFACT_NAME: tiny-health-app-image
 
 jobs:
   build-package:
-    # Use a fresh GitHub-hosted runner for the build.
     runs-on: ubuntu-latest
 
     strategy:
+      # Set to false so if V1 fails, V2 still completes.
       fail-fast: false
       matrix:
-        version_id: [V1,V2]
+        # These are labels that match your secrets (PYTHON_V1, PYTHON_V2)
+        version_id: [V1, V2]
 
     steps:
       - name: Check out repository
-        # Get the repository files onto the runner.
-        uses: actions/checkout@v6
+        uses: actions/checkout@v4
 
       - name: Fetch Python Version from Secret
         id: get-version
         env:
-           SECRET_VAL: ${{ secrets[format('PYTHON_{0}', matrix.version_label)] }}
+          # This pulls the actual secret value (e.g., 3.11) based on the matrix ID
+          SECRET_VAL: ${{ secrets[format('PYTHON_{0}', matrix.version_id)] }}
         run: |
-           echo "selected_version=$VERSION" >> "$GITHUB_OUTPUT"
+          # We save the secret value to the step output so others can use it
+          echo "selected_version=$SECRET_VAL" >> "$GITHUB_OUTPUT"
 
       - name: Set up Python
-        # Prepare Python so the workflow can run the tests first.
-        uses: actions/setup-python@v6
+        uses: actions/setup-python@v5
         with:
-          python-version: ${{ matrix.version_id }}
+          # IMPORTANT: Use the output from the fetch step, NOT the matrix ID
+          python-version: ${{ steps.get-version.outputs.selected_version }}
 
       - name: Run tests
-        # Build only after the verification step passes.
         run: python -m unittest discover -s tests -v
 
       - name: Set image tag
-        # Create one simple tag so the image is easy to identify in this run.
         id: image-tag
         run: |
-          IMAGE_TAG="run-${GITHUB_RUN_NUMBER}"
+          # Added the version ID to the tag to distinguish between the two builds
+          IMAGE_TAG="${{ matrix.version_id }}-run-${GITHUB_RUN_NUMBER}"
           echo "image_tag=$IMAGE_TAG" >> "$GITHUB_OUTPUT"
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      - name: new-Build Docker image with docker build
+      - name: Build Docker image
         uses: docker/build-push-action@v6
         with:
-          outputs: type=docker,dest=${{ env.IMAGE_TAR }} 
+          context: .
+          # We give the tar file a unique name per matrix run
+          outputs: type=docker,dest=${{ matrix.version_id }}-${{ env.IMAGE_TAR }}
           tags: ${{ env.IMAGE_NAME }}:${{ steps.image-tag.outputs.image_tag }}
 
-
       - name: Upload build artifact
-        # Store the packaged output so a later workflow can use the exact same package.
         uses: actions/upload-artifact@v4
         with:
-          name: ${{ env.ARTIFACT_NAME }}
-          path: ${{ env.IMAGE_TAR }}
+          # Unique name for each artifact so they don't overwrite each other
+          name: ${{ env.ARTIFACT_NAME }}-${{ matrix.version_id }}
+          path: ${{ matrix.version_id }}-${{ env.IMAGE_TAR }}
           retention-days: 7

@@ -17,16 +17,27 @@ jobs:
     # Use a fresh GitHub-hosted runner for the build.
     runs-on: ubuntu-latest
 
+    strategy:
+      matrix:
+        version_id: [V1, V2]
+
     steps:
       - name: Check out repository
         # Get the repository files onto the runner.
         uses: actions/checkout@v6
 
+      - name: Fetch Python Version from Secret
+        id: get-version
+        run: |
+          # Dynamically picks PYTHON_V1 or PYTHON_V2
+          VERSION=${{ secrets[format('PYTHON_{0}', matrix.version_id)] }}
+          echo "selected_version=$VERSION" >> "$GITHUB_OUTPUT"
+
       - name: Set up Python
         # Prepare Python so the workflow can run the tests first.
         uses: actions/setup-python@v6
         with:
-          python-version: "3.12"
+          python-version: ${{ matrix.version_id }}
 
       - name: Run tests
         # Build only after the verification step passes.

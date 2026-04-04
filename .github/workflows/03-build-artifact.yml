@@ -45,15 +45,11 @@ jobs:
         uses: docker/build-push-action@v6
         with:
             context: .
-            load: true 
+
             outputs: type=docker,dest=${{ env.IMAGE_TAR }} 
             tags: ${{ steps.meta.outputs.tags }}
             labels: ${{ steps.meta.outputs.labels }}
 
-
-      - name: Save Docker image as artifact file
-        # Convert that exact tagged image into a file that can be reused later.
-        run: docker save "${IMAGE_NAME}:${{ steps.image-tag.outputs.image_tag }}" -o "${IMAGE_TAR}"
 
       - name: Upload build artifact
         # Store the packaged output so a later workflow can use the exact same package.

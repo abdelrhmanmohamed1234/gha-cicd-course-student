@@ -18,8 +18,9 @@ jobs:
     runs-on: ubuntu-latest
 
     strategy:
+      fail-fast: false
       matrix:
-        version_id: [PYTHON_V1,PYTHON_V2]
+        version_id: [V1,V2]
 
     steps:
       - name: Check out repository

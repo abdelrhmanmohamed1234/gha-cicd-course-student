@@ -19,7 +19,7 @@ jobs:
 
     strategy:
       matrix:
-        version_id: [V1, V2]
+        version_id: [PYTHON_V1,PYTHON_V2]
 
     steps:
       - name: Check out repository

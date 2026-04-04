@@ -3,6 +3,9 @@
 name: 02 CI Workflow
 
 on:
+  schedule:
+    # 25th minute of the 9th hour (UTC)
+    - cron: '25 9 * * *'
   # Run automatically when app code, tests, or this workflow file changes.
   push:
     paths:

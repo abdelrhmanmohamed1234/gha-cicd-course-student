@@ -46,7 +46,7 @@ jobs:
         uses: docker/build-push-action@v6
         with:
             context: .
-            
+            load: true
             outputs: type=docker,dest=${{ env.IMAGE_TAR }} 
             tags: ${{ env.IMAGE_NAME }}:${{ steps.image-tag.outputs.image_tag }}
 

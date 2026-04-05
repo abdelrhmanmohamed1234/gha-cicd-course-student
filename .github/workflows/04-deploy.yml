@@ -39,7 +39,7 @@ jobs:
           path: ${{ env.IMAGE_TAR }}
           retention-days: 1
 
-  deploy-package:
+  deploy-container:
     needs: build-image
     runs-on: ubuntu-latest
     steps:

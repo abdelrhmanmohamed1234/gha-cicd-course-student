@@ -3,44 +3,61 @@ name: 04 Deploy Workflow
 on:
   workflow_dispatch:
     inputs:
-      run_id:
-        description: "Run ID of the build workflow to deploy"
-        required: true
-  workflow_run:
-    workflows: ["03 Build Artifact Workflow"]
-    types: [completed]
+      python_version:
+        description: "Python base image tag"
+        default: "3.12-slim"
+        required: false
 
-permissions:
-  actions: read
-  contents: read
+env:
+  IMAGE_NAME: tiny-health-app
+  IMAGE_TAR: tiny-health-app.tar
+  PYTHON_VERSION: ${{ inputs.python_version || '3.12-slim' }}
 
 jobs:
-  deploy-package:
-    if: ${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success' }}
+  build-image:
     runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
 
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build Docker image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          outputs: type=docker,dest=${{ env.IMAGE_TAR }}
+          tags: ${{ env.IMAGE_NAME }}:run-${{ github.run_number }}
+          build-args: |
+            PYTHON_VERSION=${{ env.PYTHON_VERSION }}
+
+      - name: Upload image as artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ env.IMAGE_NAME }}-image
+          path: ${{ env.IMAGE_TAR }}
+          retention-days: 1
+
+  deploy-package:
+    needs: build-image
+    runs-on: ubuntu-latest
     steps:
       - name: Download build artifact
         uses: actions/download-artifact@v4
         with:
-          name: tiny-health-app-image
-          github-token: ${{ github.token }}
-          repository: ${{ github.repository }}
-          run-id: ${{ github.event.workflow_run.id || inputs.run_id }}
+          name: ${{ env.IMAGE_NAME }}-image
           path: downloaded-artifact
 
-      - name: Show downloaded files
-        run: ls -R downloaded-artifact
-
       - name: Load Docker image
-        run: docker load --input downloaded-artifact/tiny-health-app.tar
+        run: docker load --input downloaded-artifact/${{ env.IMAGE_TAR }}
 
       - name: Start container
         run: |
           docker run -d \
             --name tiny-health-container \
             -p 8000:8000 \
-            "tiny-health-app:run-${{ github.event.workflow_run.run_number || inputs.run_id }}"
+            "${{ env.IMAGE_NAME }}:run-${{ github.run_number }}"
 
       - name: Smoke test deployed app
         run: |

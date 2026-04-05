@@ -1,67 +1,61 @@
-# This workflow completes the story by delivering the saved package.
-# It starts after the build workflow finishes successfully.
-name: 04 Deploy Workflow
+name: 03 Build Artifact Workflow
 
 on:
-  workflow_run:
-    # Listen for the build workflow by name.
-    workflows: ["03 Build Artifact Workflow"]
-    # Start when the build workflow has completed.
-    types: [completed]
+  push:
+    paths:
+      - "app/**"
+      - "tests/**"
+      - ".github/workflows/03-build-artifact.yml"
+  workflow_dispatch:
+    inputs:
+      python_version:
+        description: "Python base image tag"
+        default: "3.12-slim"
+        required: false
 
-permissions:
-  # Read access is enough because this workflow only downloads artifacts and reads repo data.
-  actions: read
-  contents: read
+env:
+  IMAGE_NAME: tiny-health-app
+  IMAGE_TAR: tiny-health-app.tar
+  ARTIFACT_NAME: tiny-health-app-image
+  PYTHON_VERSION: ${{ inputs.python_version || '3.12-slim' }}
 
 jobs:
-  deploy-package:
-    # Continue only when the build workflow succeeded.
-    if: ${{ github.event.workflow_run.conclusion == 'success' }}
-    # Use a fresh runner for the deployment simulation.
+  run-tests:
     runs-on: ubuntu-latest
-
     steps:
-      - name: Download build artifact
-        # Download the exact artifact produced by the build run.
-        uses: actions/download-artifact@v8
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
         with:
-          name: tiny-health-app-image
-          github-token: ${{ github.token }}
-          repository: ${{ github.repository }}
-          run-id: ${{ github.event.workflow_run.id }}
-          path: downloaded-artifact
+          python-version: "3.12"
 
-      - name: Show downloaded files
-        # Quick visibility step so students can see what arrived from the build.
-        run: ls -R downloaded-artifact
+      - name: Run tests
+        run: python -m unittest discover -s tests -v
 
-      - name: Load Docker image
-        # Turn the saved artifact file back into a Docker image.
-        run: docker load --input downloaded-artifact/tiny-health-app.tar
+  build-artifact:
+    runs-on: ubuntu-latest
+    needs: run-tests
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
 
-      - name: Start container
-        # Start the exact same tagged image that the build workflow created.
-        run: |
-          docker run -d \
-            --name tiny-health-container \
-            -p 8000:8000 \
-            "tiny-health-app:run-${{ github.event.workflow_run.run_number }}"
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
 
-      - name: Smoke test deployed app
-        # Retry a few times because app startup can take a moment.
-        run: |
-          for attempt in 1 2 3 4 5; do
-            if curl --fail --silent http://127.0.0.1:8000/health; then
-              exit 0
-            fi
-            echo "Waiting for app to become ready..."
-            sleep 2
-          done
-          echo "App did not become ready in time."
-          exit 1
+      - name: Build Docker image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          outputs: type=docker,dest=${{ env.IMAGE_TAR }}
+          tags: ${{ env.IMAGE_NAME }}:run-${{ github.run_number }}
+          build-args: |
+            PYTHON_VERSION=${{ env.PYTHON_VERSION }}
 
-      - name: Stop container
-        if: always()
-        # Clean up even if an earlier step fails.
-        run: docker rm -f tiny-health-container || true
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ env.ARTIFACT_NAME }}
+          path: ${{ env.IMAGE_TAR }}
+          retention-days: 7
